@@ -2,11 +2,10 @@
 # -*- coding: utf-8 -*-
 """
 Python/NumPy port of [1]. Original MATLAB code available at the authors
-websites.
+websites. This code implements the generalized beta divergence, as in the
+authors technical report [2].
 
-Algorithms available for the initializations of rNMF are listed in [2-4].
-
-TODO: Implement fp32 computation instead of just fp64.
+Algorithms available for the initializations of rNMF are listed in [3-5].
 
 Created on Mon Dec 24 2018.
 
@@ -16,14 +15,17 @@ REFERENCES:
     [1] Févotte, Cédric, and Nicolas Dobigeon. "Nonlinear hyperspectral
     unmixing with robust nonnegative matrix factorization." IEEE Transactions
     on Image Processing 24.12 (2015): 4810-4819.
-    [2] Cichocki, Andrzej, and Anh-Huy Phan. "Fast local algorithms for large
+    [2] Févotte, Cédric, and Nicolas Dobigeon. "Nonlinear hyperspectral
+    unmixing with robust nonnegative matrix factorization." arXiv preprint
+    arXiv:1401.5649 (2014).
+    [3] Cichocki, Andrzej, and Anh-Huy Phan. "Fast local algorithms for large
     scale nonnegative matrix and tensor factorizations." IEICE transactions on
     fundamentals of electronics, communications and computer sciences 92.3
     (2009): 708-721.
-    [3] Févotte, Cédric, and Jérôme Idier. "Algorithms for nonnegative matrix
+    [4] Févotte, Cédric, and Jérôme Idier. "Algorithms for nonnegative matrix
     factorization with the β-divergence." Neural computation 23.9 (2011):
     2421-2456.
-    [4] Boutsidis, Christos, and Efstratios Gallopoulos. "SVD based
+    [5] Boutsidis, Christos, and Efstratios Gallopoulos. "SVD based
     initialization: A head start for nonnegative matrix factorization." Pattern
     Recognition 41.4 (2008): 1350-1362.
 """
