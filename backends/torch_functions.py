@@ -342,7 +342,7 @@ def beta_divergence(mat1, mat2, beta):
     # Utilities:
     # Defining epsilon to protect against division by zero:
     # TODO: fp64 vs fp32
-    if data.type() == 'torch.cuda.FloatTensor':
+    if mat1.type() == 'torch.cuda.FloatTensor':
         eps = 1.3e-7  # Slightly higher than actual epsilon in fp32
         torch.set_default_tensor_type(torch.cuda.FloatTensor)
     else:
@@ -483,5 +483,5 @@ if __name__ == "__main__":
     T = sio.loadmat('../testforcoeff.mat')
     data = T['data']
     data = torch.tensor(data, dtype=torch.float32).cuda()
-    basis, coeff, outlier, obj = robust_nmf(data, 2, 2, 'NMF', 10, 0, 1e-7,
+    basis, coeff, outlier, obj = robust_nmf(data, 2, 1.5, 'random', 10, 0, 1e-7,
                                             1000, 1)
