@@ -37,6 +37,115 @@ from sklearn.decomposition import NMF
 from sklearn.decomposition.nmf import _initialize_nmf
 
 
+def robust_nmf(data, rank, beta, init, reg_val, sum_to_one, tol, max_iter=1000,
+               print_every=10, user_prov=None):
+    '''
+    This function performs the robust NMF algorithm.
+
+    Input:
+        1. data: data to be factorized. WIP: based on the data type of 'data',
+        all computations performed at fp32 or fp64. fp64 implemented currently.
+        2. rank: rank of the factorization/number of components.
+        3. beta: parameter of the beta-divergence used.
+            Special cases:
+            beta = 2: Squared Euclidean distance (Gaussian noise assumption)
+            beta = 1: Kullback-Leibler divergence (Poisson noise assumption)
+            beta = 0: Itakura-Saito divergence (multiplicative gamma noise
+            assumption)
+        4. init: Initialization method used for robust NMF.
+            init == 'random': Draw uniform random values (recommended).
+            init == 'NMF': Uses a small run of regular NMF to get initial
+            values and initializes outliers uniformly at random.
+            init == 'bNMF': Uses a small run of beta NMF to get initial values
+            and initializes outliers uniformly at random.
+            init == 'nndsvdar': Uses Boutsidis' modified algorithm and
+            initializes outliers uniformly at random.
+            init == 'user': the user can provide their own initialization in
+            the form of a python dictionary with the keys: 'basis', 'coeff' and
+            'outlier'.
+        5. reg_val: Weight of L-2,1 regularization.
+        6. sum_to_one: flag indicating whether a sum-to-one constraint is to be
+        applied on the factor matrices.
+        7. tol: tolerance on the iterative optimization. Recommended: 1e-7.
+        8. max_iter: maximum number of iterations.
+        9. print_every: Number of iterations at which to show optimization
+        progress.
+
+    Output:
+        1. basis: basis matrix of the factorization.
+        2. coeff: coefficient matrix of the factorization.
+        3. outlier: sparse outlier matrix.
+        4. obj: objective function progress.
+
+    NOTE: init == 'bNMF' applies the same beta parameter as required for rNMF,
+    which is nice, but is slow due to multiplicative updates
+    '''
+
+    # Utilities:
+    # Defining epsilon to protect against division by zero:
+    if data.type() == 'torch.cuda.FloatTensor':
+        eps = 1.3e-7  # Slightly higher than actual epsilon in fp32
+        torch.set_default_tensor_type(torch.cuda.FloatTensor)
+    else:
+        eps = 2.3e-16  # Slightly higher than actual epsilon in fp64
+        torch.set_default_tensor_type(torch.cuda.DoubleTensor)
+
+    # Initialize rNMF:
+    basis, coeff, outlier = initialize_rnmf(data, rank, init, beta,
+                                            sum_to_one, user_prov)
+
+    # Set up for the algorithm:
+    # Initial approximation of the reconstruction:
+    data_approx = basis@coeff + outlier + eps
+    fit = torch.zeros(max_iter+1)
+    obj = torch.zeros(max_iter+1)
+
+    # Monitoring convergence:
+    fit[0] = beta_divergence(data, data_approx, beta)
+    obj[0] = (fit[0] +
+              reg_val*torch.sum(torch.sqrt(torch.sum(outlier**2, dim=0))))
+
+    # Print initial iteration:
+    print('Iter = 0; Obj = {}'.format(obj[0]))
+
+    for iter in range(max_iter):
+        # Update the outlier matrix:
+        outlier = update_outlier(data, data_approx, outlier, beta, reg_val)
+        data_approx = basis@coeff + outlier + eps  # Update reconstuction
+
+        # Update the coefficient matrix:
+        coeff = update_coeff(data, data_approx, beta, basis, coeff, sum_to_one)
+        data_approx = basis@coeff + outlier + eps  # Update reconstruction
+
+        # Update the basis matrix:
+        basis = update_basis(data, data_approx, beta, basis, coeff)
+        data_approx = basis@coeff + outlier + eps  # Update reconstruction
+
+        # Monitor optimization:
+        fit[iter+1] = beta_divergence(data, data_approx, beta)
+        obj[iter+1] = (fit[iter+1] +
+                       reg_val*torch.sum(torch.sqrt(torch.sum(outlier**2,
+                                                              dim=0))))
+
+        if iter % print_every == 0:  # print progress
+            print('Iter = {}; Obj = {}; Err = {}'.format(iter+1, obj[iter+1],
+                  torch.abs((obj[iter]-obj[iter+1])/obj[iter])))
+
+        # Termination criterion:
+        if torch.abs((obj[iter]-obj[iter+1])/obj[iter]) <= tol:
+            print('Algorithm converged as per defined tolerance')
+            break
+
+        if iter == (max_iter - 1):
+            print('Maximum number of iterations acheived')
+
+    # In case the algorithm terminated early:
+    obj = obj[:iter]
+    fit = fit[:iter]
+
+    return basis, coeff, outlier, obj
+
+
 def initialize_rnmf(data, rank, alg, beta=2, sum_to_one=0, user_prov=None):
     '''
     This function retrieves factor matrices to initialize rNMF. It can do this
@@ -119,7 +228,6 @@ def initialize_rnmf(data, rank, alg, beta=2, sum_to_one=0, user_prov=None):
         coeff = model.components_
 
         # Bringing output back into the GPU:
-        # TODO: explicitly cast to fp64 or fp32
         print('Done. Switching back to PyTorch.')
         if data.type() == 'torch.cuda.FloatTensor':
             basis = torch.tensor(basis, dtype=torch.float32).cuda()
@@ -143,7 +251,6 @@ def initialize_rnmf(data, rank, alg, beta=2, sum_to_one=0, user_prov=None):
         coeff = model.components_
 
         # Bringing output back into the GPU:
-        # TODO: explicitly cast to fp64 or fp32
         print('Done. Switching back to PyTorch.')
         if data.type() == 'torch.cuda.FloatTensor':
             basis = torch.tensor(basis, dtype=torch.float32).cuda()
@@ -164,7 +271,6 @@ def initialize_rnmf(data, rank, alg, beta=2, sum_to_one=0, user_prov=None):
         basis, coeff = _initialize_nmf(data.cpu().numpy(), n_components=rank)
 
         # Bringing output back into the GPU:
-        # TODO: explicitly cast to fp64 or fp32
         print('Done. Switching back to PyTorch.')
         if data.type() == 'torch.cuda.FloatTensor':
             basis = torch.tensor(basis, dtype=torch.float32).cuda()
@@ -193,6 +299,11 @@ def initialize_rnmf(data, rank, alg, beta=2, sum_to_one=0, user_prov=None):
               'outlier' not in user_prov):
             raise ValueError('Wrong format for initialization dictionary')
 
+        elif (user_prov['basis'].type() != data.type() or
+              user_prov['coeff'].type() != data.type() or
+              user_prov['outlier'].type() != data.type()):
+            raise ValueError('Initializations must the same dtype as data')
+
         return user_prov['basis'], user_prov['coeff'], user_prov['outlier']
 
     else:
@@ -201,114 +312,6 @@ def initialize_rnmf(data, rank, alg, beta=2, sum_to_one=0, user_prov=None):
         raise ValueError(
             'Invalid algorithm (typo?): got %r instead of one of %r' %
             (alg, ('random', 'NMF', 'bNMF', 'nndsvdar', 'user')))
-
-
-def robust_nmf(data, rank, beta, init, reg_val, sum_to_one, tol, max_iter=1000,
-               print_every=10, user_prov=None):
-    '''
-    This function performs the robust NMF algorithm.
-
-    Input:
-        1. data: data to be factorized. WIP: based on the data type of 'data',
-        all computations performed at fp32 or fp64. fp64 implemented currently.
-        2. rank: rank of the factorization/number of components.
-        3. beta: parameter of the beta-divergence used.
-            Special cases:
-            beta = 2: Squared Euclidean distance (Gaussian noise assumption)
-            beta = 1: Kullback-Leibler divergence (Poisson noise assumption)
-            beta = 0: Itakura-Saito divergence (multiplicative gamma noise
-            assumption)
-        4. init: Initialization method used for robust NMF.
-            init == 'random': Draw uniform random values (recommended).
-            init == 'NMF': Uses a small run of regular NMF to get initial
-            values and initializes outliers uniformly at random.
-            init == 'bNMF': Uses a small run of beta NMF to get initial values
-            and initializes outliers uniformly at random.
-            init == 'nndsvdar': Uses Boutsidis' modified algorithm and
-            initializes outliers uniformly at random.
-            init == 'user': the user can provide their own initialization in
-            the form of a python dictionary with the keys: 'basis', 'coeff' and
-            'outlier'.
-        5. reg_val: Weight of L-2,1 regularization.
-        6. sum_to_one: flag indicating whether a sum-to-one constraint is to be
-        applied on the factor matrices.
-        7. tol: tolerance on the iterative optimization. Recommended: 1e-7.
-        8. max_iter: maximum number of iterations.
-        9. print_every: Number of iterations at which to show optimization
-        progress.
-
-    Output:
-        1. basis: basis matrix of the factorization.
-        2. coeff: coefficient matrix of the factorization.
-        3. outlier: sparse outlier matrix.
-        4. obj: objective function progress.
-
-    NOTE: init == 'bNMF' applies the same beta parameter as required for rNMF,
-    which is nice, but is slow due to multiplicative updates
-    '''
-
-    # Utilities:
-    # Defining epsilon to protect against division by zero:
-    if data.type() == 'torch.cuda.FloatTensor':
-        eps = 1.3e-7  # Slightly higher than actual epsilon in fp32
-        torch.set_default_tensor_type(torch.cuda.FloatTensor)
-    else:
-        eps = 2.3e-16  # Slightly higher than actual epsilon in fp64
-        torch.set_default_tensor_type(torch.cuda.DoubleTensor)
-
-    # Initialize rNMF:
-    basis, coeff, outlier = initialize_rnmf(data, rank, init, beta,
-                                            sum_to_one, user_prov)
-
-    # Set up for the algorithm:
-    data_approx = basis@coeff  # initial approximation of the reconstruction
-    fit = torch.zeros(max_iter+1)
-    obj = torch.zeros(max_iter+1)
-
-    # Monitoring convergence:
-    fit[0] = beta_divergence(data, data_approx, beta)
-    obj[0] = (fit[0] +
-              reg_val*torch.sum(torch.sqrt(torch.sum(outlier**2, dim=0))))
-
-    # Print initial iteration:
-    print('Iter = 0; Obj = {}'.format(obj[0]))
-
-    for iter in range(max_iter):
-        # Update the outlier matrix:
-        outlier = update_outlier(data, data_approx, outlier, beta, reg_val)
-        data_approx = basis@coeff + outlier + eps  # Update reconstuction
-
-        # Update the coefficient matrix:
-        coeff = update_coeff(data, data_approx, beta, basis, coeff, sum_to_one)
-        data_approx = basis@coeff + outlier + eps  # Update reconstruction
-
-        # Update the basis matrix:
-        basis = update_basis(data, data_approx, beta, basis, coeff)
-        data_approx = basis@coeff + outlier + eps  # Update reconstruction
-
-        # Monitor optimization:
-        fit[iter+1] = beta_divergence(data, data_approx, beta)
-        obj[iter+1] = (fit[iter+1] +
-                       reg_val*torch.sum(torch.sqrt(torch.sum(outlier**2,
-                                                              dim=0))))
-
-        if iter % print_every == 0:  # print progress
-            print('Iter = {}; Obj = {}; Err = {}'.format(iter+1, obj[iter+1],
-                  torch.abs((obj[iter]-obj[iter+1])/obj[iter])))
-
-        # Termination criterion:
-        if torch.abs((obj[iter]-obj[iter+1])/obj[iter]) <= tol:
-            print('Algorithm converged as per defined tolerance')
-            break
-
-        if iter == (max_iter - 1):
-            print('Maximum number of iterations acheived')
-
-    # In case the algorithm terminated early:
-    obj = obj[:iter]
-    fit = fit[:iter]
-
-    return basis, coeff, outlier, obj
 
 
 def beta_divergence(mat1, mat2, beta):
@@ -341,7 +344,6 @@ def beta_divergence(mat1, mat2, beta):
 
     # Utilities:
     # Defining epsilon to protect against division by zero:
-    # TODO: fp64 vs fp32
     if mat1.type() == 'torch.cuda.FloatTensor':
         eps = 1.3e-7  # Slightly higher than actual epsilon in fp32
         torch.set_default_tensor_type(torch.cuda.FloatTensor)
@@ -459,7 +461,6 @@ def update_outlier(data, data_approx, outlier, beta, reg_val):
     '''
     # Utilities:
     # Defining epsilon to protect against division by zero:
-    # TODO: fp64 vs fp32
     if data.type() == 'torch.cuda.FloatTensor':
         eps = 1.3e-7  # Slightly higher than actual epsilon in fp32
         torch.set_default_tensor_type(torch.cuda.FloatTensor)
