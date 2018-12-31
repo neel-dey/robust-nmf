@@ -56,9 +56,9 @@ The MATLAB fp64 implementation was tested on an Intel i7-5930K overclocked to 4.
 
 The Tesla P100 is specifically meant for scientific workloads, so fp64 performance is only half of fp32 in terms of TFLOPs. However, appreciable speedups can be achieved even with an entry-level gaming GPU from two generations ago with low fp64 performance. With an NVIDIA GTX 970, at fp32 there is a 29-34X speedup over MATLAB on the CPU (depending on whether you use the simplex constraint or not). At fp64, it's less significant with a 4-4.7X speedup over the CPU.
 
-NOTE 1: since R2018a (or R2017b, not sure) which was used here, MATLAB does block processing on element-wise operations automatically, leading to significant improvements in speed for rNMF.
+NOTE 1: since R2018a (or R2017b, not sure) which was used here, MATLAB does block processing on element-wise operations automatically, leading to significant improvements in speed for rNMF. This makes the original MATLAB implementation faster than the NumPy implementation.
 
-NOTE 2: MATLAB can use GPUs as well via the ```gpuArray()`` data type, but only at fp32, which may be suboptimal for some optimization problems.
+NOTE 2: MATLAB can use GPUs as well via the ```gpuArray()``` data type, but only at fp32, which may be suboptimal for some optimization problems.
 
 ## License
 
