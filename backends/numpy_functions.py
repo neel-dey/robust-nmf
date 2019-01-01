@@ -421,11 +421,3 @@ def update_outlier(data, data_approx, outlier, beta, reg_val):
     return outlier * ((data*bet2(data_approx)) / (bet1(data_approx) +
                                                   reg_val*l2n(outlier)))
 
-
-if __name__ == "__main__":
-    import scipy.io as sio
-    T = sio.loadmat('testforcoeff.mat')
-    data = T['data']
-    basis, coeff, outlier, obj = robust_nmf(data, 2, 2, 'random', 10, 0, 1e-7,
-                                            10, 1)
-

@@ -477,12 +477,3 @@ def update_outlier(data, data_approx, outlier, beta, reg_val):
                                                                     p=2,
                                                                     dim=0,
                                                                     eps=eps)))
-
-
-if __name__ == "__main__":
-    import scipy.io as sio
-    T = sio.loadmat('../testforcoeff.mat')
-    data = T['data']
-    data = torch.tensor(data, dtype=torch.float32).cuda()
-    basis, coeff, outlier, obj = robust_nmf(data, 2, 1.5, 'random', 10, 0, 1e-7,
-                                            1000, 1)
