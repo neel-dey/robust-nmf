@@ -85,10 +85,8 @@ def robust_nmf(data, rank, beta, init, reg_val, sum_to_one, tol, max_iter=1000,
     # Defining epsilon to protect against division by zero:
     if data.type() == 'torch.cuda.FloatTensor':
         eps = 1.3e-7  # Slightly higher than actual epsilon in fp32
-        torch.set_default_tensor_type(torch.cuda.FloatTensor)
     else:
         eps = 2.3e-16  # Slightly higher than actual epsilon in fp64
-        torch.set_default_tensor_type(torch.cuda.DoubleTensor)
 
     # Initialize rNMF:
     basis, coeff, outlier = initialize_rnmf(data, rank, init, beta,
@@ -196,10 +194,8 @@ def initialize_rnmf(data, rank, alg, beta=2, sum_to_one=0, user_prov=None):
     # Defining epsilon to protect against division by zero:
     if data.type() == 'torch.cuda.FloatTensor':
         eps = 1.3e-7  # Slightly higher than actual epsilon in fp32
-        torch.set_default_tensor_type(torch.cuda.FloatTensor)
     else:
         eps = 2.3e-16  # Slightly higher than actual epsilon in fp64
-        torch.set_default_tensor_type(torch.cuda.DoubleTensor)
 
     # Initialize outliers with uniform random values:
     outlier = torch.rand(data.size()[0], data.size()[1])
@@ -346,10 +342,8 @@ def beta_divergence(mat1, mat2, beta):
     # Defining epsilon to protect against division by zero:
     if mat1.type() == 'torch.cuda.FloatTensor':
         eps = 1.3e-7  # Slightly higher than actual epsilon in fp32
-        torch.set_default_tensor_type(torch.cuda.FloatTensor)
     else:
         eps = 2.3e-16  # Slightly higher than actual epsilon in fp64
-        torch.set_default_tensor_type(torch.cuda.DoubleTensor)
 
     # Inline function for vectorizing arrays for readability:
     vec = lambda X: X.flatten()
@@ -463,10 +457,8 @@ def update_outlier(data, data_approx, outlier, beta, reg_val):
     # Defining epsilon to protect against division by zero:
     if data.type() == 'torch.cuda.FloatTensor':
         eps = 1.3e-7  # Slightly higher than actual epsilon in fp32
-        torch.set_default_tensor_type(torch.cuda.FloatTensor)
     else:
         eps = 2.3e-16  # Slightly higher than actual epsilon in fp64
-        torch.set_default_tensor_type(torch.cuda.DoubleTensor)
 
     # Using inline functions for readability:
     bet1 = lambda X: X**(beta-1)

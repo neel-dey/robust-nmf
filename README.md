@@ -42,6 +42,10 @@ from backends.numpy_functions import *
 For PyTorch:
 ```python
 from backends.torch_functions import *
+torch.set_default_tensor_type(torch.cuda.DoubleTensor)
+
+# Or if you want fp32 computation:
+# torch.set_default_tensor_type(torch.cuda.FloatTensor)
 ```
 
 A couple of minimal working examples with random data are provided in the `./example_notebooks/` folder.
