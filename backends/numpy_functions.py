@@ -129,7 +129,7 @@ def robust_nmf(data, rank, beta, init, reg_val, sum_to_one, tol, max_iter=1000,
             break
 
         if iter == (max_iter - 1):
-            print('Maximum number of iterations acheived')
+            print('Maximum number of iterations achieved')
 
     # In case the algorithm terminated early:
     obj = obj[:iter]
@@ -216,7 +216,7 @@ def initialize_rnmf(data, rank, alg, beta=2, sum_to_one=0, user_prov=None):
 
     elif alg == 'NMF':
         print('Initializing rNMF with NMF.')
-        model = NMF(n_components=rank, init='nndsvd', verbose=True)
+        model = NMF(n_components=rank, init='nndsvdar', verbose=True)
         basis = model.fit_transform(data)
         coeff = model.components_
 
@@ -228,7 +228,9 @@ def initialize_rnmf(data, rank, alg, beta=2, sum_to_one=0, user_prov=None):
 
     elif alg == 'nndsvdar':
         print('Initializing rNMF with nndsvdar.')
-        basis, coeff = _initialize_nmf(data, n_components=rank)
+        basis, coeff = _initialize_nmf(data,
+                                       n_components=rank,
+                                       init='nndsvdar')
 
         # Rescale coefficients if they will have a simplex constraint later:
         if sum_to_one == 1:
