@@ -135,7 +135,7 @@ def robust_nmf(data, rank, beta, init, reg_val, sum_to_one, tol, max_iter=1000,
             break
 
         if iter == (max_iter - 1):
-            print('Maximum number of iterations acheived')
+            print('Maximum number of iterations achieved')
 
     # In case the algorithm terminated early:
     obj = obj[:iter]
@@ -242,7 +242,7 @@ def initialize_rnmf(data, rank, alg, beta=2, sum_to_one=0, user_prov=None):
         # Switching to CPU as there is no GPU implementation of NMF:
 
         print('Initializing rNMF with NMF. Switching to NumPy.')
-        model = NMF(n_components=rank, init='nndsvd', verbose=True)
+        model = NMF(n_components=rank, init='nndsvdar', verbose=True)
         basis = model.fit_transform(data.cpu().numpy())
         coeff = model.components_
 
@@ -264,7 +264,9 @@ def initialize_rnmf(data, rank, alg, beta=2, sum_to_one=0, user_prov=None):
     elif alg == 'nndsvdar':
         # Switching to CPU as there is no GPU implementation of nndsvdar:
         print('Initializing rNMF with nndsvdar. Switching to NumPy.')
-        basis, coeff = _initialize_nmf(data.cpu().numpy(), n_components=rank)
+        basis, coeff = _initialize_nmf(data.cpu().numpy(),
+                                       n_components=rank,
+                                       init='nndsvdar')
 
         # Bringing output back into the GPU:
         print('Done. Switching back to PyTorch.')
